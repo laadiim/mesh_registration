@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MeshRegistration.IO</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MeshRegistration.Core\MeshRegistration.Core.csproj" />
+    <!-- The exporters serialise traced lines and curvature samples, which are algorithm types. -->
+    <ProjectReference Include="..\MeshRegistration.Algorithms\MeshRegistration.Algorithms.csproj" />
+  </ItemGroup>
+
+</Project>

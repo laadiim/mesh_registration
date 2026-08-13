@@ -1,0 +1,43 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,csproj,props,slnx}]
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+# CA1711 forbids type names ending in "Flags". For a [Flags] enum that suffix is the clearest
+# possible name (VertexFlags, CurvatureFlags) and the rule's stated intent — avoiding confusion
+# with the framework's own suffixes — does not apply.
+dotnet_diagnostic.CA1711.severity = none
+
+# CA1002/CA1051 push List<T> and fields behind properties on public surfaces. This codebase
+# deliberately exposes arrays and spans on hot data structures to avoid indirection.
+dotnet_diagnostic.CA1002.severity = none
+
+# CA1814 prefers jagged over multidimensional arrays; not relevant here.
+dotnet_diagnostic.CA1814.severity = none
+
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning
+dotnet_sort_system_directives_first = true
+
+[tests/**.cs]
+# Test names follow the Subject_Behaviour convention, which needs underscores.
+dotnet_diagnostic.CA1707.severity = none
+
+# Test classes are discovered by reflection and are conventionally public.
+dotnet_diagnostic.CA1515.severity = none
+
+# Readability beats micro-optimisation in test bodies.
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1806.severity = none

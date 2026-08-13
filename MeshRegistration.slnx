@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MeshRegistration.Core/MeshRegistration.Core.csproj" />
+    <Project Path="src/MeshRegistration.IO/MeshRegistration.IO.csproj" />
+    <Project Path="src/MeshRegistration.Algorithms/MeshRegistration.Algorithms.csproj" />
+    <Project Path="src/MeshRegistration.Cli/MeshRegistration.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MeshRegistration.Core.Tests/MeshRegistration.Core.Tests.csproj" />
+    <Project Path="tests/MeshRegistration.Algorithms.Tests/MeshRegistration.Algorithms.Tests.csproj" />
+  </Folder>
+</Solution>

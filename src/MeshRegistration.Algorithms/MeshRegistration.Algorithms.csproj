@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MeshRegistration.Algorithms</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MeshRegistration.Core\MeshRegistration.Core.csproj" />
+  </ItemGroup>
+
+</Project>
