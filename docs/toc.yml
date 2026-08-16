@@ -1,0 +1,41 @@
+- name: Přehled
+  href: README.md
+
+- name: Článek — výklad problematiky
+  href: clanek.md
+
+- name: 01 — Architektura
+  href: 01-architektura.md
+
+- name: 02 — Načítání a topologie
+  href: 02-nacitani-a-topologie.md
+
+- name: 03 — Odhad křivosti
+  href: 03-krivosti.md
+
+- name: 04 — Trasování čar
+  href: 04-trasovani.md
+
+- name: 05 — Výstupy
+  href: 05-vystupy.md
+
+- name: 06 — Parametry
+  href: 06-parametry.md
+
+- name: 07 — Testování
+  href: 07-testovani.md
+
+- name: 08 — Naměřené výsledky
+  href: 08-vysledky.md
+
+- name: 09 — Návrh fáze 2
+  href: 09-dalsi-faze.md
+
+- name: 10 — Generování dokumentace
+  href: 10-generovani.md
+
+- name: 11 — Dávkové zpracování
+  href: 11-davkove-zpracovani.md
+
+- name: 12 — Analytické tvary
+  href: 12-analyticke-tvary.md

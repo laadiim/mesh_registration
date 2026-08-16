@@ -22,12 +22,14 @@ with notes on what they will need.
 ```
 src/MeshRegistration.Core/         Vec3, BoundingBox, TangentFrame; Sym2x2, Sym3x3Solver;
                                    Triangle, TriangleMesh, SurfacePoint, MeshTopology,
-                                   MeshBuilder (topology repair), MeshDiagnostics
+                                   MeshBuilder (topology repair), MeshDiagnostics,
+                                   AnalyticShapes (surfaces with known curvature)
 src/MeshRegistration.IO/           ObjReader; Export/ (polylines, tubes, vertex-coloured mesh,
-                                   CSV, JSON report)
+                                   CSV, JSON report, RunDiagnosis)
 src/MeshRegistration.Algorithms/   Curvature/ (ShapeOperatorField), Tracing/ (SurfaceWalker,
                                    LineTracer, SeedSelector)
-src/MeshRegistration.Cli/          System.CommandLine entry point; `inspect` and `trace`
+src/MeshRegistration.Cli/          System.CommandLine entry point; `inspect` and `trace`,
+                                   both accepting a file or `--shape`
 tests/MeshRegistration.Core.Tests/         Sym2x2, mesh repair, OBJ reader
 tests/MeshRegistration.Algorithms.Tests/   analytic surfaces, curvature, tracing, exports
 ```
@@ -52,6 +54,19 @@ dotnet test
 dotnet run -c Release --project src/MeshRegistration.Cli -- trace data/kac1.obj --out out
 ```
 
+A generated surface can stand in for a file, which is how tracing is checked without reference
+data — on a cylinder the max-curvature line must be a circle:
+
+```bash
+dotnet run -c Release --project src/MeshRegistration.Cli -- trace --shape waves --out out
+```
+
+Batch over a directory, with a summary table and a CI-usable exit code:
+
+```bash
+./scripts/run-all.sh
+```
+
 Test data is not in the repository. Unpack it with:
 
 ```bash
@@ -72,7 +87,8 @@ These are the reasons the rewrite exists. Breaking one silently undoes the work.
 
 2. **A finite direction is not a usable direction.** Because the eigensolver always returns a
    number, callers must check `CurvatureSample.HasUsableDirection` (i.e. the `Umbilic` flag), never
-   just whether the vector is non-zero. On real scans 8–26% of vertices are umbilic. `LineTracer`
+   just whether the vector is non-zero. On real scans 1.4–31% of vertices are umbilic and up to
+   44% are planar — 73% of `eie1.obj` has no principal direction at all. `LineTracer`
    and `SeedSelector` both depend on this.
 
 3. **Loading must repair, never refuse.** `MeshBuilder` handles degenerate and duplicate faces,
@@ -82,14 +98,20 @@ These are the reasons the rewrite exists. Breaking one silently undoes the work.
 
 4. **Every threshold is dimensionless.** Lengths are multiples of `TriangleMesh.AverageEdgeLength`
    or fractions of `BoundingBox.DiagonalLength`; curvature thresholds are curvature times the
-   neighbourhood radius. The sample data spans diagonals from 0.14 to 256.6, so an absolute
+   neighbourhood radius. The sample data spans diagonals from 0.13 to 399.6 — a factor of 2900 —
+   so an absolute
    constant anywhere is a bug. If you find yourself typing a bare number with units, stop.
 
 5. **Determinism.** No random number generator anywhere. Seeds are ranked deterministically with
    the vertex index as tie-break; parallel work writes results by index. Two runs must produce
    byte-identical output (`TraceAll_IsDeterministic`).
 
-6. **The mesh is immutable.** `TriangleMesh` exposes `ReadOnlySpan`. Never let a stage mutate the
+6. **Which field a line follows is measured, not assumed.** `--field` fixes only the seed
+   direction; from then on the tracer follows curve continuity, because the min/max labels
+   exchange along umbilic curves. Every sample records `FollowedDirection`, and the report carries
+   the tally. Do not document or assume "it follows max" — read the number.
+
+7. **The mesh is immutable.** `TriangleMesh` exposes `ReadOnlySpan`. Never let a stage mutate the
    mesh it is reading — the previous tracer appended visualisation points to the mesh it was
    walking, desynchronising it from the per-vertex weight array. Visualisation geometry belongs in
    the exporters.
@@ -152,6 +174,10 @@ Two subtleties when tightening a tolerance:
 Topology tests use hand-built meshes isolating one defect each (bow-tie, three-fan edge,
 inconsistent winding, isolated vertex, per-face duplicated vertices).
 
+`AnalyticShapeTracingTests` checks the named shapes against what each one guarantees — that lines
+on `waves` really are circles or spokes, that the parabolic cylinder's rulings really are straight
+— rather than merely that nothing crashed.
+
 Real-data expectations, useful as a cross-check: `hip1.obj` has 2 bow-tie and 4 isolated vertices;
 `hea1.obj` has 3 isolated; `cha1.obj` has 32 non-manifold edges, 221 bow-ties, 23 isolated, 4257
 degenerate faces; `cha2m.obj` has 70 non-manifold edges and 499 bow-ties.
@@ -168,6 +194,21 @@ degenerate faces; `cha2m.obj` has 70 non-manifold edges and 499 bow-ties.
 
 When changing behaviour, update the affected `docs/` file in the same commit — the measured tables
 in `docs/08-vysledky.md` in particular go stale silently.
+
+## API documentation
+
+XML doc comments feed a DocFX site (`./scripts/build-docs.sh`). Two things to know:
+
+- DocFX reads the **compiled assemblies**, not the sources, because its bundled Roslyn does not
+  run source generators and would reject the generated `ReportJsonContext`. A Release build must
+  precede it; the script handles that.
+- The build runs with `--warningsAsErrors`, so a broken cross-document link fails it. Any new
+  markdown file must be reachable from a `toc.yml`, and any file linked to must fall inside the
+  `content` glob in `docfx.json`.
+
+Writing conventions for the comments themselves are in `docs/10-generovani.md`. The short version:
+`<summary>` says what a thing is, `<remarks>` says why it is that way and names the concrete defect
+it avoids.
 
 Code comments and identifiers are English. When explaining *why* something differs from the
 previous implementation, name the concrete defect rather than saying "improved" — that context is

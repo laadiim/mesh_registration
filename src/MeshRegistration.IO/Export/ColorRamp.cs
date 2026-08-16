@@ -38,6 +38,16 @@ public enum ColorBy
 
     /// <summary>A distinct colour per line. Lines only.</summary>
     Line,
+
+    /// <summary>
+    /// Which principal direction each sample followed. Lines only.
+    /// </summary>
+    /// <remarks>
+    /// Answers "is this line on the maximum or the minimum field" by measurement rather than by
+    /// assumption — a line seeded on one field can continue onto the other wherever the two
+    /// curvatures cross and the labels exchange.
+    /// </remarks>
+    Followed,
 }
 
 /// <summary>
@@ -101,6 +111,14 @@ public static class ColorRamp
             ? Lerp(new ColorRgb(30, 40, 110), new ColorRgb(30, 160, 150), t * 2)
             : Lerp(new ColorRgb(30, 160, 150), new ColorRgb(250, 220, 60), (t - 0.5) * 2);
     }
+
+    /// <summary>Colour code for which principal direction a sample followed.</summary>
+    public static ColorRgb ForFollowedDirection(Algorithms.Tracing.FollowedDirection followed) => followed switch
+    {
+        Algorithms.Tracing.FollowedDirection.Max => new ColorRgb(200, 60, 60),   // red: maximum
+        Algorithms.Tracing.FollowedDirection.Min => new ColorRgb(50, 100, 210),  // blue: minimum
+        _ => new ColorRgb(160, 160, 160),                                        // grey: transported
+    };
 
     /// <summary>
     /// A distinct, repeatable colour per index, for telling one line from another.

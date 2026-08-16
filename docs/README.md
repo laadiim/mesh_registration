@@ -7,6 +7,7 @@ výsledky.
 
 | dokument | obsah |
 |---|---|
+| [Článek](clanek.md) | souvislý výklad problematiky: úloha, matematika, obě úskalí, výsledky |
 | [01 — Architektura](01-architektura.md) | projekty, tok dat, klíčové typy, invarianty řešení |
 | [02 — Načítání a topologie](02-nacitani-a-topologie.md) | OBJ čtečka, corner table, oprava nemanifoldních sítí |
 | [03 — Odhad křivosti](03-krivosti.md) | metoda nejmenších čtverců, vlastní čísla 2×2, detekce degenerace |
@@ -16,6 +17,9 @@ výsledky.
 | [07 — Testování](07-testovani.md) | analytické plochy, topologické testy, co který test hlídá |
 | [08 — Naměřené výsledky](08-vysledky.md) | statistiky nad 24 reálnými sítěmi, výkon |
 | [09 — Návrh fáze 2](09-dalsi-faze.md) | co zbývá a na co si dát pozor |
+| [10 — Generování dokumentace](10-generovani.md) | jak vznikne API reference a web z XML komentářů |
+| [11 — Dávkové zpracování](11-davkove-zpracovani.md) | spuštění nad celou složkou, souhrnná tabulka, použití v CI |
+| [12 — Analytické tvary](12-analyticke-tvary.md) | generované plochy se známou křivostí místo vstupního souboru |
 
 Ostatní dokumenty v kořeni repozitáře:
 

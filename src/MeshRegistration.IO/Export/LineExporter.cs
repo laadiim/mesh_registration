@@ -236,7 +236,7 @@ public static class LineExporter
 
         public static SampleColorSource Create(IReadOnlyList<TracedLine> lines, ColorBy mode)
         {
-            if (mode is ColorBy.Line or ColorBy.Flags)
+            if (mode is ColorBy.Line or ColorBy.Flags or ColorBy.Followed)
             {
                 return new SampleColorSource(mode, 0, 1);
             }
@@ -253,6 +253,7 @@ public static class LineExporter
         {
             ColorBy.Line => ColorRamp.Categorical(line.Id),
             ColorBy.Flags => ColorRamp.ForFlags(sample.Flags),
+            ColorBy.Followed => ColorRamp.ForFollowedDirection(sample.Followed),
             ColorBy.GeodesicCurvature or ColorBy.KMin or ColorBy.KMax or ColorBy.Mean or ColorBy.Gaussian =>
                 ColorRamp.Diverging(SymmetricNormalise(Scalar(_mode, sample))),
             _ => ColorRamp.Sequential(Normalise(Scalar(_mode, sample))),

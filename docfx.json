@@ -1,0 +1,65 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+
+  "metadata": [
+    {
+      "comment": [
+        "Metadata is extracted from the compiled assemblies and their XML documentation files,",
+        "not from the .csproj sources. DocFX compiles sources with its own bundled Roslyn, which",
+        "does not run source generators — the JSON serializer context in MeshRegistration.IO is",
+        "generated, so a source-based pass reports it as an incomplete partial class. Reading the",
+        "Release output instead uses exactly what the real compiler produced.",
+        "Run `dotnet build -c Release` before generating the documentation."
+      ],
+      "src": [
+        {
+          "files": [
+            "src/MeshRegistration.Core/bin/Release/net10.0/MeshRegistration.Core.dll",
+            "src/MeshRegistration.Algorithms/bin/Release/net10.0/MeshRegistration.Algorithms.dll",
+            "src/MeshRegistration.IO/bin/Release/net10.0/MeshRegistration.IO.dll"
+          ]
+        }
+      ],
+      "dest": "api",
+      "namespaceLayout": "nested",
+      "memberLayout": "separatePages",
+      "enumSortOrder": "declaringOrder",
+      "outputFormat": "mref"
+    }
+  ],
+
+  "build": {
+    "content": [
+      {
+        "files": [ "**/*.{md,yml}" ],
+        "exclude": [
+          "_site/**",
+          "bin/**",
+          "obj/**",
+          "src/**",
+          "tests/**",
+          "data/**",
+          "out/**"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [ "docfx-assets/**" ]
+      }
+    ],
+    "output": "_site",
+    "template": [ "default", "modern" ],
+    "globalMetadata": {
+      "_appName": "MeshRegistration",
+      "_appTitle": "MeshRegistration — API a technická dokumentace",
+      "_appFooter": "Registrace trojúhelníkových sítí podle křivkových podpisů — fáze 1",
+      "_enableSearch": true,
+      "_disableContribution": true,
+      "pdf": false
+    },
+    "sitemap": {
+      "baseUrl": "https://example.invalid/meshregistration"
+    }
+  }
+}

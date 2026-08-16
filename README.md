@@ -18,8 +18,20 @@ clustering and ICP are not implemented yet.
 |---|---|
 | this file | why the rewrite exists, the two defects it fixes |
 | [MANUAL.md](MANUAL.md) | operating guide — commands, reading the output, common adjustments (Czech) |
+| [docs/clanek.md](docs/clanek.md) | a connected account of the problem: the task, the mathematics, both pitfalls, results (Czech) |
 | [docs/](docs/README.md) | detailed technical documentation — mathematics, algorithms, measurements (Czech) |
 | [CLAUDE.md](CLAUDE.md) | guidance for Claude Code working in this repository |
+
+An API reference is generated from the XML doc comments and combined with the documents above
+into one searchable site:
+
+```bash
+./scripts/build-docs.sh --serve
+```
+
+Requires DocFX (`dotnet tool install --global docfx --version 2.77.0` — the version is pinned
+because 2.78+ needs an ASP.NET Core 10 runtime the SDK does not ship). Details, including why
+DocFX rather than Doxygen, are in [docs/10-generovani.md](docs/10-generovani.md).
 
 ## Building and running
 
@@ -46,6 +58,12 @@ dotnet run -c Release --project src/MeshRegistration.Cli -- trace data/kac1.obj 
 `--help` on either command lists the options. Everything is tunable in dimensionless units — see
 "Scale invariance" below.
 
+Run the whole dataset at once, in parallel, with a summary table and a CI-usable exit code:
+
+```bash
+./scripts/run-all.sh
+```
+
 ## Output files
 
 | file | what it is |
@@ -53,7 +71,7 @@ dotnet run -c Release --project src/MeshRegistration.Cli -- trace data/kac1.obj 
 | `<n>_lines_tube.obj` + `.mtl` | each line as a thin tube of triangles, one colour per line. **Open this one first** — it renders in any MeshLab shading mode |
 | `<n>_lines.obj` | the same lines as exact OBJ polylines (`v` + `l`); compact, best for feeding other tools |
 | `<n>_curvature.obj` | the input mesh with per-vertex colours. With `--color-by flags`: grey = planar, blue = umbilic, orange = boundary, red = no usable fit, green = usable |
-| `<n>_samples.csv` | one row per sample: `lineId, sampleIndex, arcLength, x,y,z, nx,ny,nz, kMin, kMax, kappaG, confidence, flags, triangle`. This is the handover to the matching stage |
+| `<n>_samples.csv` | one row per sample: `lineId, sampleIndex, arcLength, x,y,z, nx,ny,nz, kMin, kMax, kappaG, confidence, flags, followed, triangle`. This is the handover to the matching stage |
 | `<n>_report.json` | topology repair report and tracing statistics |
 
 ## Layout
@@ -130,8 +148,8 @@ aniso = (kMax − kMin)/2 · r      < 0.05  →  Umbilic  (direction meaningless
 curv  = max(|kMax|,|kMin|) · r   < 0.02  →  Planar   (values meaningless too)
 ```
 
-This matters at scale: on the sample data **8% to 26% of vertices are umbilic** and up to 3% are
-planar. Downstream, `SeedSelector` never starts a line at such a point, and `LineTracer` stops
+This matters at scale: on the sample data **1.4% to 31% of vertices are umbilic** and up to **44%**
+are planar — on `eie1.obj` 73% of the surface has no principal direction at all. Downstream, `SeedSelector` never starts a line at such a point, and `LineTracer` stops
 consulting the direction field there and continues by parallel transport instead — tracing a
 geodesic that bridges short degenerate patches while keeping arc-length parameterisation intact,
 and cutting the line when the run gets long enough that continuing would be guesswork.
@@ -140,15 +158,15 @@ and cutting the line when the run gets long enough that continuing would be gues
 
 ## Scale invariance
 
-The sample data spans bounding box diagonals from 0.14 to 256.6 — three orders of magnitude. Every
+The sample data spans bounding box diagonals from 0.13 to 399.6 — a factor of 2900. Every
 absolute threshold in the previous code was therefore meaningless on some of it. The clearest case:
 `length = 30` gave an 11-sample stub on `brd1.obj` and attempted about 43 000 steps across a model
 214 times smaller on `hea1.obj`.
 
 Every tolerance here is a ratio: neighbourhood radius and tracing step in multiples of the mean
 edge length, line length and seed spacing as fractions of the bounding box diagonal, degeneracy
-thresholds as curvature times radius. Mean traced line length now lands between 0.12 and 0.34 of
-the diagonal across the whole dataset.
+thresholds as curvature times radius. Mean traced line length lands between 0.012 and 0.43 of the
+diagonal across the whole dataset.
 
 ## Other corrections worth knowing about
 

@@ -9,11 +9,6 @@ namespace MeshRegistration.Cli.Commands;
 /// </summary>
 internal static class CommonOptions
 {
-    public static Argument<FileInfo> Input { get; } = new("input")
-    {
-        Description = "Input mesh in Wavefront OBJ format.",
-    };
-
     public static Option<NonManifoldEdgePolicy> NonManifold { get; } = EnumOption.Create(
         "--nonmanifold",
         "How to resolve edges shared by three or more triangles.",
@@ -62,10 +57,10 @@ internal static class CommonOptions
                 RepairOrientation = !parseResult.GetValue(NoOrientationRepair),
             });
 
-    /// <summary>Adds the shared mesh-loading options to a command.</summary>
+    /// <summary>Adds the shared mesh-loading argument and options to a command.</summary>
     public static void AddSharedTo(Command command)
     {
-        command.Arguments.Add(Input);
+        MeshSourceResolver.AddTo(command);
         command.Options.Add(NonManifold);
         command.Options.Add(Weld);
         command.Options.Add(WeldTolerance);

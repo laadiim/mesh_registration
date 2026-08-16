@@ -100,7 +100,7 @@ na modelu jakékoliv velikosti.
 ## `_samples.csv` — rozhraní pro fázi 2
 
 ```
-lineId,sampleIndex,arcLength,x,y,z,nx,ny,nz,kMin,kMax,kappaG,confidence,flags,triangle
+lineId,sampleIndex,arcLength,x,y,z,nx,ny,nz,kMin,kMax,kappaG,confidence,flags,followed,triangle
 0,0,0,52.0924277930,32.5496230697,57.1255159619,-0.7922722186,...,None,46717
 ```
 
@@ -115,6 +115,7 @@ lineId,sampleIndex,arcLength,x,y,z,nx,ny,nz,kMin,kMax,kappaG,confidence,flags,tr
 | `kappaG` | znaménková geodetická křivost |
 | `confidence` | kvalita proložení, ⟨0,1⟩ |
 | `flags` | textový výčet oddělený `|`, např. `Umbilic|Planar` |
+| `followed` | které hlavní pole vzorek sledoval: `Max`, `Min`, nebo `Transported` |
 | `triangle` | index trojúhelníka, ve kterém vzorek leží |
 
 Trojice `kMin, kMax, kappaG` je podpis, který bude párovat fáze 2. Vzorky jsou ekvidistantní
@@ -139,6 +140,15 @@ opětovné načtení nic neztratí. Bez BOM.
     "DiagonalLength": 1.28256,
     "IsClean": false
   },
+  "Curvature": {
+    "VertexCount": 169862,
+    "PlanarVertices": 4761,
+    "UmbilicVertices": 44572,
+    "UnusableVertices": 2455,
+    "BoundaryVertices": 24990,
+    "NeighbourhoodRadius": 0.020265,
+    "UsableFraction": 0.6957
+  },
   "Tracing": {
     "SeedCount": 50,
     "LineCount": 28,
@@ -147,10 +157,17 @@ opětovné načtení nic neztratí. Bez BOM.
     "MeanLineLength": 0.03419,
     "DegenerateSamples": 48,
     "EndReasons": { "SelfIntersection": 32, "Boundary": 18, "Degenerate": 6 },
-    "NonFiniteSamples": 0
+    "NonFiniteSamples": 0,
+    "SamplesOnMaxField": 402,
+    "SamplesOnMinField": 100,
+    "MaxFieldFraction": 0.8008
   }
 }
 ```
+
+Oddíl `Curvature` je hlavní statistika fáze odhadu křivosti: kolik plochy vůbec nese použitelný
+hlavní směr. `SamplesOnMaxField` / `SamplesOnMinField` říkají, na kterém poli čáry reálně skončily
+— `--field` určuje jen směr na seedu, dál rozhoduje spojitost křivky.
 
 `NonFiniteSamples` je explicitní kontrola, ne jen statistika: pokud není nula, příkaz `trace`
 skončí návratovým kódem **2**. Únik NaN z odhadu křivosti byl původní chyba, takže se nehlásí jako

@@ -8,6 +8,20 @@ kdekoliv chyba. Podrobněji v [01 — Invarianty](01-architektura.md#invarianty-
 
 ---
 
+## Vstup
+
+Místo souboru lze nechat vygenerovat plochu se známou křivostí — pak je poznat, jestli čáry jdou
+správně. Viz [12 — Analytické tvary](12-analyticke-tvary.md).
+
+| parametr | přepínač | výchozí | popis |
+|---|---|---|---|
+| vstupní soubor | poziční argument | — | OBJ; vynechá se při `--shape` |
+| tvar | `--shape` | — | `plane`, `sphere`, `cylinder`, `torus`, `waves`, `parabolic-cylinder`, `paraboloid`, `saddle`, `monkey-saddle`, `ellipsoid` |
+| jemnost tvaru | `--shape-resolution` | `120` | dělení mřížky generovaného tvaru |
+| uložit tvar | `--save-shape` | `false` | zapíše i samotnou plochu jako `<název>_shape.obj` |
+
+Zadat obojí naráz je chyba; program to ohlásí.
+
 ## Načítání — `ObjReadOptions`
 
 | parametr | přepínač | výchozí | jednotka | popis |
@@ -91,8 +105,8 @@ nebo na degenerovanou oblast. Na roztříštěných modelech je stejně omezuje 
 
 | parametr | přepínač | výchozí | popis |
 |---|---|---|---|
-| `ColorBy` (síť) | `--color-by` | `flags` | `flags`, `aniso`, `kmin`, `kmax`, `mean`, `gauss`, `confidence`, `kappa-g`, `line` |
-| `ColorBy` (trubičky) | `--tube-color-by` | `line` | totéž |
+| `ColorBy` (síť) | `--color-by` | `flags` | `flags`, `aniso`, `kmin`, `kmax`, `mean`, `gauss`, `confidence` |
+| `ColorBy` (trubičky) | `--tube-color-by` | `line` | totéž, plus `line`, `kappa-g` a `followed` (ty dávají smysl jen pro čáry) |
 | `TubeRadius` | `--tube-radius` | `0.2` | násobek průměrné hrany |
 | `SurfaceOffset` | — | `0.25` | násobek průměrné hrany; odsazení proti z-fightingu |
 | `TubeSides` | — | `6` | rozlišení průřezu trubičky |

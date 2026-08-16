@@ -5,3 +5,9 @@ data/
 *.user
 .vs/
 .idea/
+
+# Generated documentation. api/index.md is hand-written and stays tracked; everything else
+# under api/ is produced by `docfx metadata`.
+_site/
+api/*.yml
+api/.manifest

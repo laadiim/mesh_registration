@@ -4,12 +4,12 @@
 dotnet test
 ```
 
-72 testů, běh ~3 s.
+97 testů, běh ~3 s.
 
 | projekt | testů | co pokrývá |
 |---|---|---|
 | `MeshRegistration.Core.Tests` | 41 | eigensolver 2×2, oprava topologie, čtečka OBJ |
-| `MeshRegistration.Algorithms.Tests` | 31 | křivosti na analytických plochách, trasování, exporty |
+| `MeshRegistration.Algorithms.Tests` | 56 | křivosti, trasování, analytické tvary, exporty, diagnostika |
 
 ---
 
@@ -19,7 +19,9 @@ Správnost se prokazuje proti **plochám se známou křivostí v uzavřeném tva
 skenům. U reálného skenu není s čím porovnávat, takže test může nanejvýš zachytit pád — u koule
 se dá porovnat s `1/R`.
 
-Generátor je `tests/MeshRegistration.Algorithms.Tests/AnalyticSurfaces.cs`.
+Generátory jsou v knihovně (`MeshRegistration.Core.Mesh.AnalyticShapes`), takže plochy, které
+ověřují testy, a plochy, které kreslí `meshreg --shape`, jsou tentýž kód — viz
+[12](12-analyticke-tvary.md).
 
 | plocha | `kMin` | `kMax` | role |
 |---|---|---|---|
@@ -96,6 +98,32 @@ Ručně sestavené sítě, každá izolující jednu závadu:
 > `Cylinder_PrincipalLinesAreGeodesics` odhalil druhou skutečnou chybu: geodetická křivost se
 > počítala z úhlu mezi syrovými trojrozměrnými tětivami, což je křivost křivky **v prostoru**.
 > Očekáváno 0, naměřeno −1.05 ≈ −1/R. Oprava je promítnout obě tětivy do tečné roviny.
+
+### Analytické tvary
+
+`AnalyticShapeTracingTests` trasuje všech deset pojmenovaných tvarů a měří výsledek proti tomu, co
+daný tvar zaručuje — ne jen že to nespadlo.
+
+| test | co měří |
+|---|---|
+| `DegenerateShapes_YieldNoLines` | na rovině a kouli nesmí vzniknout ani jedna čára |
+| `Waves_EveryLineIsAConcentricCircleOrARadialSpoke` | rozptyl poloměru a opsaný úhel každé čáry; musí padnout do jedné z obou rodin, a obě rodiny se musí objevit |
+| `ParabolicCylinder_MaxFieldLinesAreStraight` | čára se nesmí odchýlit napříč rulings; `κ_g ≈ 0` |
+| `Cylinder_MaxFieldLinesStayAtConstantHeightAndRadius` | konstantní poloměr i výška |
+| `EveryShape_BuildsAValidManifoldMesh` | generované sítě jsou manifoldní a souvislé |
+
+### Které pole čára sleduje
+
+| test | co měří |
+|---|---|
+| `Cylinder_LineStaysOnTheFieldItWasSeededOn` | na válci se křivosti nikdy neprotnou, takže čára musí zůstat 100 % na svém poli |
+| `Sphere_SamplesAreRecordedAsTransportedNotAsAField` | na kouli nesmí žádný vzorek tvrdit, že sledoval pole |
+
+### Diagnostika běhu
+
+`RunDiagnosisTests` ověřuje, že se krátký běh vysvětlí **tou příčinou, která opravdu nastala**.
+Obsahuje explicitní kontrolu, že se nevrátí dřívější chybná hláška „flat or spherical" na
+nesvařené síti.
 
 ### Exporty
 

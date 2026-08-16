@@ -93,6 +93,35 @@ best = argmax |candidate · incoming|,   orientovaný tak, aby mířil dopředu
 Na anizotropní ploše jsou obě pole kolmá a příchozí směr je už jednomu z nich blízký, takže tohle
 samo od sebe drží jedno pole — a přitom zůstane správné tam, kde si označení vymění role.
 
+#### Které pole čára reálně sleduje
+
+`--field` určuje **jen směr na seedu**. Dál rozhoduje spojitost, takže čára může přejít na druhé
+pole. Každý vzorek proto nese `FollowedDirection` (`Max` / `Min` / `Transported`) — je to
+měření, ne předpoklad.
+
+Naměřeno na reálných datech (podíl vzorků, které sledovaly maximální pole):
+
+| model | `--field max` | `--field min` |
+|---|---|---|
+| `brd1` | 93 % | 14 % |
+| `hip1` | 88 % | 9 % |
+| `hea1` | 85 % | 9 % |
+| `dra1` | 74 % | 13 % |
+| `Head_2` | 64 % | 31 % |
+| `kac1` | **52 %** | **51 %** |
+
+Volba seedu tedy dominuje — čára většinou zůstane, kde začala. Míchání je ale znatelné (7–48 %)
+a na `kac1` je poměr v obou režimech zhruba 50/50: ten model má hodně umbilických křivek, přes
+které se označení vyměňuje.
+
+Na válci, kde se křivosti nikdy neprotnou a žádná umbilická křivka neexistuje, je to 100/0 —
+hlídají to testy `Cylinder_LineStaysOnTheFieldItWasSeededOn`.
+
+**Proč se nedrží označení natvrdo.** Bylo by to geometricky špatně: v místě výměny označení by
+čára odbočila o 90°, tedy přestala by být integrální křivkou. Navíc je poloha výměny citlivá na
+šum, takže dva skeny téhož objektu by odbočily jinde a vytrasovaly různé křivky — přesně to, co by
+fázi 2 rozbilo. Spojitost dá tutéž křivku bez ohledu na označení.
+
 ### Degenerované oblasti
 
 Pokud vzorek **nemá použitelný směr** (`Umbilic` nebo `Planar`), tracer se na směrové pole přestane

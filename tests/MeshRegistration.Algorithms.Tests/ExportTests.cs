@@ -162,25 +162,41 @@ public sealed class ExportTests : IDisposable
             Assert.DoesNotContain("Infinity", line, StringComparison.OrdinalIgnoreCase);
         }
 
-        // Every numeric column must round-trip.
+        // Every numeric column must round-trip. Columns 13 and 14 are the flag and followed-field
+        // names; the last is the triangle index.
+        string[] header = text[0].Split(',');
         string[] fields = text[1].Split(',');
-        Assert.Equal(15, fields.Length);
+        Assert.Equal(16, header.Length);
+        Assert.Equal(header.Length, fields.Length);
+
         for (int i = 0; i < 13; i++)
         {
             Assert.True(
                 double.TryParse(fields[i], CultureInfo.InvariantCulture, out _),
-                $"Column {i} did not parse: '{fields[i]}'");
+                $"Column {i} ({header[i]}) did not parse: '{fields[i]}'");
+        }
+
+        // The followed-field column must name a field, so "which field is this line on" is
+        // answerable from the file alone.
+        Assert.Equal("followed", header[14]);
+        foreach (string line in text.Skip(1))
+        {
+            string followed = line.Split(',')[14];
+            Assert.True(
+                Enum.TryParse<FollowedDirection>(followed, out _),
+                $"'{followed}' is not a FollowedDirection.");
         }
     }
 
     [Fact]
     public void Report_RecordsTheRunAndConfirmsNoNonFiniteSamples()
     {
-        (MeshBuildResult build, _, TracedLine[] lines) = Trace();
+        (MeshBuildResult build, ShapeOperatorField field, TracedLine[] lines) = Trace();
         string path = Path("report.json");
 
+        CurvatureReport curvature = CurvatureReport.From(build.Mesh, field);
         TracingReport tracing = TracingReport.From(lines, lines.Length, build.Mesh.AverageEdgeLength);
-        ReportExporter.Write(path, new RunReport(build.Diagnostics, tracing));
+        ReportExporter.Write(path, new RunReport(build.Diagnostics, curvature, tracing));
 
         string json = File.ReadAllText(path);
 
@@ -192,5 +208,48 @@ public sealed class ExportTests : IDisposable
 
         Assert.Equal(0, tracing.NonFiniteSamples);
         Assert.Equal(lines.Sum(line => line.SampleCount), tracing.TotalSamples);
+    }
+
+    [Fact]
+    public void CurvatureReport_ClassifiesEveryVertexExactlyOnce()
+    {
+        (MeshBuildResult build, ShapeOperatorField field, _) = Trace();
+
+        CurvatureReport report = CurvatureReport.From(build.Mesh, field);
+
+        Assert.Equal(build.Mesh.VertexCount, report.VertexCount);
+
+        // Planar, umbilic and unusable are mutually exclusive buckets, so their sum can never
+        // exceed the vertex count.
+        int degenerate = report.PlanarVertices + report.UmbilicVertices + report.UnusableVertices;
+        Assert.InRange(degenerate, 0, report.VertexCount);
+        Assert.Equal(1.0 - (degenerate / (double)report.VertexCount), report.UsableFraction, 12);
+
+        // A torus is nowhere flat and nowhere spherical, so most of it must stay usable.
+        Assert.True(
+            report.UsableFraction > 0.5,
+            $"Only {report.UsableFraction:P1} of a torus was usable, which suggests a misclassification.");
+
+        Assert.True(report.NeighbourhoodRadius > 0);
+    }
+
+    [Fact]
+    public void Report_IncludesTheDegeneracyStatisticsForBatchProcessing()
+    {
+        (MeshBuildResult build, ShapeOperatorField field, TracedLine[] lines) = Trace();
+        string path = Path("report-curvature.json");
+
+        ReportExporter.Write(path, new RunReport(
+            build.Diagnostics,
+            CurvatureReport.From(build.Mesh, field),
+            TracingReport.From(lines, lines.Length, build.Mesh.AverageEdgeLength)));
+
+        string json = File.ReadAllText(path);
+
+        // The batch script reads these from the report rather than scraping console output.
+        Assert.Contains("\"Curvature\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"PlanarVertices\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"UmbilicVertices\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"UsableFraction\"", json, StringComparison.Ordinal);
     }
 }

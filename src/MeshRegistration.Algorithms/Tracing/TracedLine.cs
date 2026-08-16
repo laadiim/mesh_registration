@@ -14,6 +14,30 @@ public enum PrincipalField
     Max,
 }
 
+/// <summary>
+/// Which principal direction a sample's travel direction actually came from.
+/// </summary>
+/// <remarks>
+/// A line is <em>seeded</em> on one field, but afterwards it follows whichever principal
+/// direction best continues the curve, because the min/max labels exchange wherever the two
+/// curvatures cross. This records what happened at each sample, so "which field is this line on"
+/// is a measurement rather than an assumption.
+/// </remarks>
+public enum FollowedDirection
+{
+    /// <summary>The direction of greatest curvature.</summary>
+    Max,
+
+    /// <summary>The direction of least curvature.</summary>
+    Min,
+
+    /// <summary>
+    /// Neither: the point was flat or spherical, so the previous direction was carried through by
+    /// parallel transport.
+    /// </summary>
+    Transported,
+}
+
 /// <summary>Why a line stopped growing.</summary>
 public enum LineEnd
 {
@@ -57,6 +81,7 @@ public enum LineEnd
 /// </param>
 /// <param name="Confidence">Quality of the curvature fit here, in <c>[0, 1]</c>.</param>
 /// <param name="Flags">Degeneracy classification at this sample.</param>
+/// <param name="Followed">Which principal direction the travel direction was taken from.</param>
 /// <remarks>
 /// The triple <c>(KMin, KMax, GeodesicCurvature)</c> is the signature the matching stage aligns.
 /// Samples are equally spaced in arc length, which is what lets two lines be compared as
@@ -72,7 +97,8 @@ public readonly record struct LineSample(
     double KMax,
     double GeodesicCurvature,
     double Confidence,
-    CurvatureFlags Flags)
+    CurvatureFlags Flags,
+    FollowedDirection Followed)
 {
     /// <summary>True when the principal direction was undefined here and the line was transported through.</summary>
     public bool IsDegenerate => (Flags & CurvatureFlags.Umbilic) != 0;
@@ -133,4 +159,29 @@ public sealed class TracedLine
 
     /// <summary>How many samples fell in a region with no defined principal direction.</summary>
     public int DegenerateSampleCount => Samples.Count(s => s.IsDegenerate);
+
+    /// <summary>How many samples followed each principal direction.</summary>
+    /// <remarks>
+    /// A line seeded on one field does not necessarily stay on it: it follows the curve, and the
+    /// min/max labels exchange along umbilic curves. This is the measurement of what actually
+    /// happened.
+    /// </remarks>
+    public (int Max, int Min, int Transported) FieldUsage()
+    {
+        int max = 0;
+        int min = 0;
+        int transported = 0;
+
+        foreach (LineSample sample in Samples)
+        {
+            switch (sample.Followed)
+            {
+                case FollowedDirection.Max: max++; break;
+                case FollowedDirection.Min: min++; break;
+                default: transported++; break;
+            }
+        }
+
+        return (max, min, transported);
+    }
 }

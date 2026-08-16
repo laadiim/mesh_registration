@@ -102,6 +102,7 @@ z invariantů níže.
 | `SurfacePoint` | bod kdekoliv na ploše: index trojúhelníka + barycentrické souřadnice |
 | `MeshTopology` | corner table + CSR sousedství. Po `MeshBuilder` je **manifoldní z konstrukce**. |
 | `MeshBuilder` | oprava topologie, viz [02](02-nacitani-a-topologie.md) |
+| `AnalyticShapes` | generátor ploch se známou křivostí (koule, válec, vlny, …), použitelný místo vstupního souboru |
 | `MeshDiagnostics` | co se našlo a co se s tím udělalo |
 
 ### Algorithms
@@ -115,6 +116,7 @@ z invariantů níže.
 | `LineTracer` | logika směrového pole a skládání čar |
 | `SeedSelector` | deterministický výběr výchozích bodů |
 | `TracedLine`, `LineSample` | výsledek, a zároveň rozhraní pro fázi 2 |
+| `FollowedDirection` | které hlavní pole vzorek reálně sledoval — měření, ne předpoklad |
 
 ### Uspořádání dat
 

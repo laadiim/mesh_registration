@@ -57,6 +57,42 @@ nekonečná hodnota (nemá nastat — je to pojistka proti návratu původní ch
 
 ---
 
+### Generovaný tvar místo souboru
+
+Místo vstupního souboru lze nechat vygenerovat plochu, u které je předem známo, jak mají čáry
+vypadat — na válci musí být kružnice kolmé k ose, na vlnách soustředné kružnice nebo paprsky:
+
+```bash
+dotnet run -c Release --project src/MeshRegistration.Cli -- trace --shape waves --out out
+```
+
+Tvary: `plane`, `sphere` (na obou nesmí vzniknout ani jedna čára), `cylinder`, `torus`, `waves`,
+`parabolic-cylinder`, `paraboloid`, `saddle`, `monkey-saddle`, `ellipsoid`.
+
+Program po doběhnutí vypíše, co má být vidět. Jemnost se řídí `--shape-resolution`, samotnou
+plochu uloží `--save-shape`. Podrobněji v [docs/12-analyticke-tvary.md](docs/12-analyticke-tvary.md).
+
+### Dávkové zpracování
+
+Spuštění nad celou složkou najednou, paralelně:
+
+```bash
+./scripts/run-all.sh
+```
+
+Zpracuje všechny `.obj` v `data/` do `out/`, vypíše souhrnnou tabulku a uloží `out/summary.csv`.
+Celý dodaný dataset (24 sítí, 4.9 M trojúhelníků) trvá kolem 13 sekund.
+
+```bash
+./scripts/run-all.sh --data jina-slozka --out vysledky --jobs 4
+./scripts/run-all.sh -- --lines 100 --seed-spacing 0.02
+```
+
+Vše za `--` se předá příkazu `meshreg trace`. Skript skončí nenulovým kódem, pokud kterákoliv síť
+selhala nebo se ve výstupu objevila nekonečná hodnota — dá se tedy použít v CI.
+
+Podrobnosti v [docs/11-davkove-zpracovani.md](docs/11-davkove-zpracovani.md).
+
 ## 3. Jak číst výstup
 
 ### Řádek `topology`
@@ -91,8 +127,8 @@ curvature  239 ms  radius 8.182; planar 89 (0.31%), umbilic 2202 (7.76%), unusab
 - **umbilic** — kulová záplata; hodnoty křivostí platí, ale hlavní **směr** neexistuje
 - **unusable** — proložení vůbec neprošlo (málo sousedů, špatná podmíněnost, izolovaný vrchol)
 
-Na reálných skenech je normální mít 8–26 % umbilických vrcholů. Tam se neseeduje a směr se odtud
-nečte.
+Na reálných skenech je normální mít 1–31 % umbilických vrcholů a u modelů s rovnými plochami
+až 44 % rovinných (`eie1.obj`: dohromady 73 %). Tam se neseeduje a směr se odtud nečte.
 
 ### Souhrn
 
@@ -158,7 +194,8 @@ Modré a šedé oblasti jsou přesně ta místa, kde původní verze vyráběla 
 ### Sloupce v CSV
 
 ```
-lineId, sampleIndex, arcLength, x, y, z, nx, ny, nz, kMin, kMax, kappaG, confidence, flags, triangle
+lineId, sampleIndex, arcLength, x, y, z, nx, ny, nz, kMin, kMax, kappaG, confidence, flags,
+followed, triangle
 ```
 
 `kMin`, `kMax`, `kappaG` je podpis, který bude párovat druhá fáze. Vzorky jsou ekvidistantní
@@ -205,15 +242,35 @@ Pozor: snížení `--umbilic-threshold` pod ~0.02 začne pouštět směry, kter�
 
 `kappaG` je druhá diference poloh, takže je to nejšumnější kanál. Pod `--step 1.0` nemá smysl jít.
 
-### Síť se rozpadá na tisíce komponent
+### Síť se rozpadá na tisíce komponent, nevznikne ani jedna čára
 
-Soubor nejspíš ukládá vlastní kopii vrcholů pro každý trojúhelník. Zapněte svařování:
+Soubor ukládá vlastní kopii vrcholů pro každý trojúhelník. Poznáte to ještě před spuštěním:
+
+```bash
+awk '{print $1}' soubor.obj | sort | uniq -c | grep -E ' (v|f)$'
+```
+
+Je-li počet `v` přesně **trojnásobkem** počtu `f`, a indexy ve stěnách jdou po řadě
+(`f 1//1 2//2 3//3`, `f 4//4 5//5 6//6`), je to tento případ. Zapněte svařování:
 
 ```bash
 --weld
 ```
 
-`inspect` to potvrdí: bez `--weld` uvidíte počet komponent zhruba rovný počtu trojúhelníků.
+`inspect` to potvrdí i po spuštění: bez `--weld` je počet komponent roven počtu trojúhelníků
+a manifoldních hran je nula. Program na to od verze s diagnostikou sám upozorní a poradí `--weld`.
+
+Reálný příklad — `Head_2.obj`, 210 984 vrcholů na 70 328 stěn:
+
+| | bez `--weld` | s `--weld` |
+|---|---|---|
+| vrcholy | 210 984 | 35 178 *(svařeno 175 862)* |
+| komponenty | **70 323** | 12 |
+| manifoldní hrany | **0** | ~105 000 |
+| nepoužitelné vrcholy | **100 %** | 0.17 % |
+| trasované čáry | **0** | 47 |
+
+Svařování geometrii nemění, jen obnoví konektivitu.
 
 ### Nemanifoldní hrany
 
@@ -221,6 +278,32 @@ Soubor nejspíš ukládá vlastní kopii vrcholů pro každý trojúhelník. Zap
 --nonmanifold cut         # výchozí: rozřízne, plocha se rozpadne na manifoldní záplaty
 --nonmanifold pair-best   # ponechá nejplošší pokračování, zbytek rozřízne
 --nonmanifold strict      # tvrdá chyba (chování původní verze), vypíše konkrétní hrany
+```
+
+### Které pole čára sleduje
+
+`--field` určuje **jen směr na seedu**. Dál se čára řídí spojitostí křivky, ne názvem pole, protože
+označení min/max se prohazuje tam, kde se obě křivosti protnou. Čára tedy může přejít na druhé pole.
+
+Kolik vzorků kde skončilo, je vidět ve výpisu:
+
+```
+field followed      max 1902 / min 1767  (52 % on max)
+```
+
+V CSV je to sloupec `followed` (`Max` / `Min` / `Transported`). A dá se to obarvit:
+
+```bash
+--tube-color-by followed
+```
+
+**červená** = maximální pole, **modrá** = minimální, **šedá** = degenerovaná oblast (čára tudy
+prošla paralelním přenosem).
+
+Rychlé sečtení z CSV:
+
+```bash
+awk -F, 'NR>1{print $15}' out/kac1_samples.csv | sort | uniq -c
 ```
 
 ### Jiné obarvení
@@ -233,7 +316,7 @@ Soubor nejspíš ukládá vlastní kopii vrcholů pro každý trojúhelník. Zap
 ```
 
 Hodnoty pro `--color-by` a `--tube-color-by`: `flags`, `aniso`, `kmin`, `kmax`, `mean`, `gauss`,
-`confidence`, `kappa-g`, `line`.
+`confidence`, `kappa-g`, `line`, `followed` (jen pro čáry).
 
 U všech výčtových voleb se nerozlišují velká písmena a pomlčky ani podtržítka nevadí — projde
 `pair-best`, `pair_best` i `PairBestContinuation`. Při překlepu program vypíše seznam platných

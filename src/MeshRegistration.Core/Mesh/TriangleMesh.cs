@@ -30,8 +30,18 @@ public sealed class TriangleMesh
     private readonly Vec3[] _faceNormals;
     private readonly double[] _vertexAreas;
 
+    /// <summary>
+    /// Wraps vertex positions and triangles, computing normals, areas and the characteristic
+    /// lengths in a single pass.
+    /// </summary>
     /// <param name="positions">Vertex positions. Taken by reference; must not be mutated afterwards.</param>
     /// <param name="triangles">Triangles. Taken by reference; must not be mutated afterwards.</param>
+    /// <exception cref="ArgumentException">The vertex array is empty.</exception>
+    /// <remarks>
+    /// Expects a repaired, consistently oriented mesh — normally the output of
+    /// <see cref="MeshBuilder.Build"/>. Constructing one directly is supported for tests, but
+    /// nothing here checks or fixes topology.
+    /// </remarks>
     public TriangleMesh(Vec3[] positions, Triangle[] triangles)
     {
         ArgumentNullException.ThrowIfNull(positions);

@@ -19,7 +19,7 @@ namespace MeshRegistration.IO.Export;
 public static class SampleCsvExporter
 {
     private const string Header =
-        "lineId,sampleIndex,arcLength,x,y,z,nx,ny,nz,kMin,kMax,kappaG,confidence,flags,triangle";
+        "lineId,sampleIndex,arcLength,x,y,z,nx,ny,nz,kMin,kMax,kappaG,confidence,flags,followed,triangle";
 
     /// <summary>UTF-8 without a byte order mark, which would otherwise corrupt the first column name.</summary>
     private static readonly System.Text.UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
@@ -59,6 +59,11 @@ public static class SampleCsvExporter
 
                 // Flag names rather than a bitmask, so the file is readable without this source.
                 writer.Write(s.Flags == 0 ? "None" : s.Flags.ToString().Replace(", ", "|", StringComparison.Ordinal));
+
+                // Which principal direction this sample actually followed. A line seeded on one
+                // field does not necessarily stay on it, so this cannot be inferred from options.
+                writer.Write(',');
+                writer.Write(s.Followed.ToString());
 
                 writer.Write(',');
                 writer.Write(s.Surface.Triangle.ToString(CultureInfo.InvariantCulture));

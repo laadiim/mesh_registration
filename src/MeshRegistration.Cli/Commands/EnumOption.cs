@@ -30,6 +30,27 @@ internal static class EnumOption
         };
     }
 
+    /// <summary>
+    /// Builds an enum option with no default, so that "not given" stays distinguishable from any
+    /// particular value.
+    /// </summary>
+    public static Option<TEnum?> CreateNullable<TEnum>(
+        string name,
+        string description,
+        params (string Alias, TEnum Value)[] aliases)
+        where TEnum : struct, Enum
+    {
+        return new Option<TEnum?>(name)
+        {
+            Description = $"{description} One of: {DescribeValues(aliases)}.",
+            CustomParser = result =>
+            {
+                TEnum parsed = Parse(result, default, aliases);
+                return result.Tokens.Count == 0 ? null : parsed;
+            },
+        };
+    }
+
     private static TEnum Parse<TEnum>(
         ArgumentResult result,
         TEnum defaultValue,

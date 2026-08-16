@@ -1,0 +1,12 @@
+- name: Úvod
+  href: index.md
+
+- name: Manuál
+  href: MANUAL.md
+
+- name: Dokumentace
+  href: docs/
+  homepage: docs/README.md
+
+- name: API reference
+  href: api/

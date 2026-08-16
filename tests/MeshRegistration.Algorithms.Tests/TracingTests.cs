@@ -189,6 +189,44 @@ public sealed class TracingTests
     }
 
     // ---------------------------------------------------------------------------------------
+    // Which field a line actually follows.
+    // ---------------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(PrincipalField.Max, FollowedDirection.Max)]
+    [InlineData(PrincipalField.Min, FollowedDirection.Min)]
+    public void Cylinder_LineStaysOnTheFieldItWasSeededOn(
+        PrincipalField seeded,
+        FollowedDirection expected)
+    {
+        // A cylinder is strongly anisotropic everywhere: kMax = 1/R around the tube, kMin = 0
+        // along the axis, and the two never cross. There is therefore no umbilic curve for the
+        // labels to exchange across, so a line must stay on the field it started on.
+        Scene scene = Prepare(
+            AnalyticSurfaces.Cylinder(1.0, 4.0, around: 160, along: 60),
+            new TracingOptions { Field = seeded, MaxLength = 2.0, MaxLines = 3 });
+
+        TracedLine line = scene.Tracer.Trace(0, scene.Seeds[0]);
+        (int max, int min, int transported) = line.FieldUsage();
+
+        Assert.Equal(0, transported);
+        Assert.Equal(line.SampleCount, expected == FollowedDirection.Max ? max : min);
+        Assert.Equal(0, expected == FollowedDirection.Max ? min : max);
+    }
+
+    [Fact]
+    public void Sphere_SamplesAreRecordedAsTransportedNotAsAField()
+    {
+        // Everything on a sphere is umbilic, so no sample may claim to have followed a field.
+        Scene scene = Prepare(AnalyticSurfaces.Sphere(2.0, 4));
+        TracedLine line = scene.Tracer.Trace(0, new SurfacePoint(0, 1.0 / 3.0, 1.0 / 3.0));
+
+        (int max, int min, int _) = line.FieldUsage();
+        Assert.Equal(0, max);
+        Assert.Equal(0, min);
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Arc-length parameterisation and general robustness.
     // ---------------------------------------------------------------------------------------
 

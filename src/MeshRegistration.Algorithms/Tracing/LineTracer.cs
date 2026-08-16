@@ -167,14 +167,17 @@ public sealed class LineTracer
             // Pick the direction that continues the curve. Where the field is degenerate this
             // keeps the transported direction, tracing a geodesic across the patch.
             bool degenerateHere = !curvature.HasUsableDirection;
+            FollowedDirection followed;
+
             if (degenerateHere)
             {
                 degenerateRun++;
+                followed = FollowedDirection.Transported;
             }
             else
             {
                 degenerateRun = 0;
-                travel = ChooseContinuation(curvature, travel);
+                (travel, followed) = ChooseContinuation(curvature, travel);
             }
 
             samples.Add(new LineSample(
@@ -187,7 +190,8 @@ public sealed class LineTracer
                 curvature.KMax,
                 GeodesicCurvature: 0, // filled in by Finalise, once the full order is known
                 curvature.Confidence,
-                curvature.Flags));
+                curvature.Flags,
+                followed));
 
             if (degenerateRun > _options.MaxDegenerateRun)
             {
@@ -234,13 +238,20 @@ public sealed class LineTracer
     /// All four signed principal directions are considered, because both the sign and the
     /// min/max labelling are conventions rather than properties of the curve.
     /// </remarks>
-    private static Vec3 ChooseContinuation(CurvatureSample curvature, Vec3 incoming)
+    private static (Vec3 Direction, FollowedDirection Followed) ChooseContinuation(
+        CurvatureSample curvature,
+        Vec3 incoming)
     {
         Vec3 best = incoming;
+        FollowedDirection bestField = FollowedDirection.Transported;
         double bestAlignment = double.NegativeInfinity;
 
-        foreach (Vec3 candidate in (ReadOnlySpan<Vec3>)[curvature.DirMax, curvature.DirMin])
+        ReadOnlySpan<Vec3> candidates = [curvature.DirMax, curvature.DirMin];
+        ReadOnlySpan<FollowedDirection> fields = [FollowedDirection.Max, FollowedDirection.Min];
+
+        for (int i = 0; i < candidates.Length; i++)
         {
+            Vec3 candidate = candidates[i];
             if (!candidate.IsUsableDirection)
             {
                 continue;
@@ -256,10 +267,11 @@ public sealed class LineTracer
             {
                 bestAlignment = orientedAlignment;
                 best = oriented;
+                bestField = fields[i];
             }
         }
 
-        return best;
+        return (best, bestField);
     }
 
     /// <summary>

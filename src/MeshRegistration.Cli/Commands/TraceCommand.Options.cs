@@ -125,13 +125,6 @@ internal static partial class TraceCommand
 
     private static int Run(ParseResult parseResult)
     {
-        FileInfo input = parseResult.GetValue(CommonOptions.Input)!;
-        if (!input.Exists)
-        {
-            Console.Error.WriteLine($"Input file not found: {input.FullName}");
-            return 1;
-        }
-
         (ObjReadOptions readOptions, MeshBuildOptions buildOptions) = CommonOptions.ReadOptions(parseResult);
 
         CurvatureOptions curvatureOptions = new()
@@ -157,7 +150,7 @@ internal static partial class TraceCommand
         try
         {
             return Execute(
-                input,
+                parseResult,
                 outputDirectory,
                 readOptions,
                 buildOptions,
@@ -180,7 +173,7 @@ internal static partial class TraceCommand
     }
 
     private static int Execute(
-        FileInfo input,
+        ParseResult parseResult,
         DirectoryInfo outputDirectory,
         ObjReadOptions readOptions,
         MeshBuildOptions buildOptions,
@@ -190,34 +183,34 @@ internal static partial class TraceCommand
         ColorBy colorTubesBy,
         double tubeRadius)
     {
-        string stem = Path.GetFileNameWithoutExtension(input.Name);
-        string Output(string suffix) => Path.Combine(outputDirectory.FullName, stem + suffix);
-
         long timestamp = Stopwatch.GetTimestamp();
-        (Vec3[] positions, Triangle[] triangles) = ObjReader.Read(input.FullName, readOptions);
-        Report("read", Stopwatch.GetElapsedTime(timestamp), $"{positions.Length} vertices, {triangles.Length} triangles");
+        MeshSource? source = MeshSourceResolver.Resolve(parseResult, readOptions);
+        if (source is null)
+        {
+            return 1;
+        }
+
+        string Output(string suffix) => Path.Combine(outputDirectory.FullName, source.Name + suffix);
+
+        Report(
+            source.IsGenerated ? "generate" : "read",
+            Stopwatch.GetElapsedTime(timestamp),
+            $"{source.Positions.Length} vertices, {source.Triangles.Length} triangles");
 
         timestamp = Stopwatch.GetTimestamp();
-        MeshBuildResult build = MeshBuilder.Build(positions, triangles, buildOptions);
+        MeshBuildResult build = MeshBuilder.Build(source.Positions, source.Triangles, buildOptions);
         Report("topology", Stopwatch.GetElapsedTime(timestamp), build.Diagnostics.ToSummary());
 
         timestamp = Stopwatch.GetTimestamp();
         ShapeOperatorField curvature = ShapeOperatorField.Compute(build.Mesh, build.Topology, curvatureOptions);
-        Report("curvature", Stopwatch.GetElapsedTime(timestamp), DescribeCurvature(build, curvature));
+        CurvatureReport curvatureReport = CurvatureReport.From(build.Mesh, curvature);
+        Report("curvature", Stopwatch.GetElapsedTime(timestamp), Describe(curvatureReport));
 
         timestamp = Stopwatch.GetTimestamp();
         List<SurfacePoint> seeds = SeedSelector.Select(build.Mesh, build.Topology, curvature, tracingOptions);
         LineTracer tracer = new(build.Mesh, build.Topology, curvature, tracingOptions);
         TracedLine[] lines = tracer.TraceAll(seeds);
         Report("tracing", Stopwatch.GetElapsedTime(timestamp), $"{seeds.Count} seed(s) -> {lines.Length} line(s)");
-
-        if (lines.Length == 0)
-        {
-            Console.Error.WriteLine();
-            Console.Error.WriteLine(
-                "No lines were traced. Every candidate point is flat or spherical, so no principal " +
-                "direction exists to follow. Inspect the exported curvature mesh to see where.");
-        }
 
         timestamp = Stopwatch.GetTimestamp();
 
@@ -232,13 +225,46 @@ internal static partial class TraceCommand
         CurvatureMeshExporter.Write(Output("_curvature.obj"), build.Mesh, curvature, colorMeshBy);
         SampleCsvExporter.Write(Output("_samples.csv"), lines);
 
+        // A generated shape has no file on disk to open alongside the lines, so offer to write it.
+        if (source.IsGenerated && parseResult.GetValue(MeshSourceResolver.SaveShape))
+        {
+            CurvatureMeshExporter.Write(Output("_shape.obj"), build.Mesh, curvature, colorMeshBy);
+        }
+
         TracingReport tracingReport = TracingReport.From(lines, seeds.Count, tracer.StepLength);
-        ReportExporter.Write(Output("_report.json"), new RunReport(build.Diagnostics, tracingReport));
+        ReportExporter.Write(
+            Output("_report.json"),
+            new RunReport(build.Diagnostics, curvatureReport, tracingReport));
 
         Report("export", Stopwatch.GetElapsedTime(timestamp), outputDirectory.FullName);
 
         Console.WriteLine();
         Summarise(tracingReport);
+
+        // On a generated shape the correct answer is known, so state it next to the result.
+        if (source.Shape is { } shape)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  expected:");
+            foreach (string chunk in Wrap(AnalyticShapes.ExpectedLinePattern(shape), 74))
+            {
+                Console.WriteLine($"    {chunk}");
+            }
+        }
+
+        // The numbers above already distinguish why a run came up short; say which one applies
+        // rather than leaving the user to work it out.
+        IReadOnlyList<string> notes = RunDiagnosis.Explain(
+            build.Diagnostics, curvatureReport, tracingReport, tracingOptions.MaxLines);
+
+        if (notes.Count > 0)
+        {
+            Console.Error.WriteLine();
+            foreach (string note in notes)
+            {
+                Console.Error.WriteLine($"  {note}");
+            }
+        }
 
         // A non-finite value anywhere is the exact failure this pipeline was rebuilt to prevent,
         // so it fails the run rather than being reported as a statistic.
@@ -252,38 +278,15 @@ internal static partial class TraceCommand
         return 0;
     }
 
-    private static string DescribeCurvature(MeshBuildResult build, ShapeOperatorField curvature)
+    private static string Describe(CurvatureReport report)
     {
-        int planar = 0;
-        int umbilic = 0;
-        int unusable = 0;
+        double total = Math.Max(1, report.VertexCount);
 
-        for (int v = 0; v < build.Mesh.VertexCount; v++)
-        {
-            // Planar and umbilic are decided from the eigenvalues, so the operator has to be
-            // decomposed to see them.
-            CurvatureFlags flags = curvature.AtVertex(v).Flags;
-
-            if ((flags & CurvatureFlags.Unusable) != 0)
-            {
-                unusable++;
-            }
-            else if ((flags & CurvatureFlags.Planar) != 0)
-            {
-                planar++;
-            }
-            else if ((flags & CurvatureFlags.Umbilic) != 0)
-            {
-                umbilic++;
-            }
-        }
-
-        double total = Math.Max(1, build.Mesh.VertexCount);
         return string.Create(CultureInfo.InvariantCulture,
-            $"radius {curvature.NeighbourhoodRadius:G4}; " +
-            $"planar {planar} ({planar * 100 / total:F2}%), " +
-            $"umbilic {umbilic} ({umbilic * 100 / total:F2}%), " +
-            $"unusable {unusable} ({unusable * 100 / total:F2}%)");
+            $"radius {report.NeighbourhoodRadius:G4}; " +
+            $"planar {report.PlanarVertices} ({report.PlanarVertices * 100 / total:F2}%), " +
+            $"umbilic {report.UmbilicVertices} ({report.UmbilicVertices * 100 / total:F2}%), " +
+            $"unusable {report.UnusableVertices} ({report.UnusableVertices * 100 / total:F2}%)");
     }
 
     private static void Summarise(TracingReport report)
@@ -294,6 +297,13 @@ internal static partial class TraceCommand
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  step / mean length  {report.StepLength:G4} / {report.MeanLineLength:G4}"));
         Console.WriteLine($"  degenerate samples  {report.DegenerateSamples} (bridged by parallel transport)");
+
+        // The seeding option only fixes the first step; the labels exchange along umbilic curves
+        // and the tracer follows the curve, so where the lines actually ran is a measurement.
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  field followed      max {report.SamplesOnMaxField} / min {report.SamplesOnMinField}" +
+            $"  ({report.MaxFieldFraction:P0} on max)"));
+
         Console.WriteLine($"  non-finite samples  {report.NonFiniteSamples}");
 
         if (report.EndReasons.Count > 0)
@@ -307,4 +317,32 @@ internal static partial class TraceCommand
 
     private static void Report(string stage, TimeSpan elapsed, string detail) =>
         Console.WriteLine($"  {stage,-10} {elapsed.TotalMilliseconds,8:F0} ms   {detail}");
+
+    /// <summary>Breaks prose into lines of at most <paramref name="width"/> characters.</summary>
+    private static IEnumerable<string> Wrap(string text, int width)
+    {
+        string[] words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        System.Text.StringBuilder line = new();
+
+        foreach (string word in words)
+        {
+            if (line.Length > 0 && line.Length + 1 + word.Length > width)
+            {
+                yield return line.ToString();
+                line.Clear();
+            }
+
+            if (line.Length > 0)
+            {
+                line.Append(' ');
+            }
+
+            line.Append(word);
+        }
+
+        if (line.Length > 0)
+        {
+            yield return line.ToString();
+        }
+    }
 }

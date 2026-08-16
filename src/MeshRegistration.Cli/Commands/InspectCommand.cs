@@ -1,14 +1,14 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.Globalization;
-using MeshRegistration.Core.Geometry;
 using MeshRegistration.Core.Mesh;
 using MeshRegistration.IO;
 
 namespace MeshRegistration.Cli.Commands;
 
 /// <summary>
-/// Loads a mesh, repairs it, and prints the topology report without running any analysis.
+/// Loads or generates a mesh, repairs it, and prints the topology report without running any
+/// analysis.
 /// </summary>
 internal static class InspectCommand
 {
@@ -19,34 +19,31 @@ internal static class InspectCommand
 
         command.SetAction(parseResult =>
         {
-            FileInfo input = parseResult.GetValue(CommonOptions.Input)!;
             (ObjReadOptions readOptions, MeshBuildOptions buildOptions) = CommonOptions.ReadOptions(parseResult);
-
-            return Run(input, readOptions, buildOptions);
+            return Run(parseResult, readOptions, buildOptions);
         });
 
         return command;
     }
 
-    private static int Run(FileInfo input, ObjReadOptions readOptions, MeshBuildOptions buildOptions)
+    private static int Run(ParseResult parseResult, ObjReadOptions readOptions, MeshBuildOptions buildOptions)
     {
-        if (!input.Exists)
-        {
-            Console.Error.WriteLine($"Input file not found: {input.FullName}");
-            return 1;
-        }
-
         try
         {
             long readStart = Stopwatch.GetTimestamp();
-            (Vec3[] positions, Triangle[] triangles) = ObjReader.Read(input.FullName, readOptions);
+            MeshSource? source = MeshSourceResolver.Resolve(parseResult, readOptions);
+            if (source is null)
+            {
+                return 1;
+            }
+
             TimeSpan readTime = Stopwatch.GetElapsedTime(readStart);
 
             long buildStart = Stopwatch.GetTimestamp();
-            MeshBuildResult result = MeshBuilder.Build(positions, triangles, buildOptions);
+            MeshBuildResult result = MeshBuilder.Build(source.Positions, source.Triangles, buildOptions);
             TimeSpan buildTime = Stopwatch.GetElapsedTime(buildStart);
 
-            Report(input, result.Diagnostics, readTime, buildTime);
+            Report(source, result.Diagnostics, readTime, buildTime);
             return 0;
         }
         catch (MeshParseException ex)
@@ -61,10 +58,10 @@ internal static class InspectCommand
         }
     }
 
-    private static void Report(FileInfo input, MeshDiagnostics d, TimeSpan readTime, TimeSpan buildTime)
+    private static void Report(MeshSource source, MeshDiagnostics d, TimeSpan readTime, TimeSpan buildTime)
     {
-        Console.WriteLine($"{input.Name}");
-        Console.WriteLine($"  read      {readTime.TotalMilliseconds,8:F0} ms   ({input.Length / 1048576.0:F1} MiB)");
+        Console.WriteLine(source.IsGenerated ? $"{source.Name} (generated)" : $"{source.Name}.obj");
+        Console.WriteLine($"  {(source.IsGenerated ? "generate" : "read"),-9} {readTime.TotalMilliseconds,8:F0} ms");
         Console.WriteLine($"  topology  {buildTime.TotalMilliseconds,8:F0} ms");
         Console.WriteLine();
 
